@@ -1,6 +1,6 @@
 #!/bin/bash
 
-REQUESTED_IP='192.168.1.50'
+REQUESTED_IP='192.168.101.150'
 LOCAL_DOMAIN='dns.test'
 
 case "$*" in
@@ -9,74 +9,56 @@ case "$*" in
 		TARGET_IP = $2
 		TARGET_DOMAIN = $3
 
-		echo 'zone "'$TARGET_DOMAIN'" {' >> /etc/powerdns/pdns.d/$(TARGET_DOMAIN).conf
-		echo '        type master;' >> /etc/powerdns/pdns.d/$(TARGET_DOMAIN).conf
-		echo '        notify no;' >> /etc/powerdns/pdns.d/$(TARGET_DOMAIN).conf
-		echo '        file "bind/'$TARGET_DOMAIN'.zone";' >> /etc/powerdns/pdns.d/$(TARGET_DOMAIN).conf
-		echo '        allow-update { none; };' >> /etc/powerdns/pdns.d/$(TARGET_DOMAIN).conf
-		echo '};' >> /etc/powerdns/pdns.d/$(TARGET_DOMAIN).conf
-
-		echo '$ORIGIN test.dns     ; base for unqualified names' >> /etc/powerdns/bind/$(TARGET_DOMAIN).zone
-		echo '$TTL 1h                 ; default time-to-live' >> /etc/powerdns/bind/$(TARGET_DOMAIN).zone
-		echo '@                       IN      SOA ns.'$LOCAL_DOMAIN $REQUESTED_IP' (' >> /etc/powerdns/bind/$(TARGET_DOMAIN).zone
-		echo '                                1; serial' >> /etc/powerdns/bind/$(TARGET_DOMAIN).zone
-		echo '                                1d; refresh' >> /etc/powerdns/bind/$(TARGET_DOMAIN).zone
-		echo '                                2h; retry' >> /etc/powerdns/bind/$(TARGET_DOMAIN).zone
-		echo '                                4w; expire' >> /etc/powerdns/bind/$(TARGET_DOMAIN).zone
-		echo '                                1h; minimum time-to-live' >> /etc/powerdns/bind/$(TARGET_DOMAIN).zone
-		echo '                        )' >> /etc/powerdns/bind/$(TARGET_DOMAIN).zone
-		echo '                        IN      NS      ns' >> /etc/powerdns/bind/$(TARGET_DOMAIN).zone
-		echo '                        IN      A      ' $TARGET_IP >> /etc/powerdns/bind/$(TARGET_DOMAIN).zone
-		echo 'ns                      IN      A      ' $TARGET_IP >> /etc/powerdns/bind/$(TARGET_DOMAIN).zone
-
-		service pdns restart
+#we will be using bind9 now so these need to change
 	;;
 
 	*)
 
-		apt-get -y update upgrade
+		apt-get update
+		apt-get -y upgrade
 
 		echo 'send dhcp-requested-address' $REQUESTED_IP ';' >> /etc/dhcp/dhclient.conf
 
-		mkdir /etc/powerdns/bind
+		apt-get -y install bind9 bind9utils
 
-		apt-get -y install pdns-server dnsutils
 
-		sed -i 's/# recursor=/recursor=8.8.8.8/g' /etc/powerdns/pdns.conf
-		sed -i 's/allow-recursion=127.0.0.1/allow-recursion=127.0.0.1,192.168.0.0\/24/g' /etc/powerdns/pdns.conf
-		#does the above line assume I am on a 192.168.0.x network?
 
-		cp adblock_include.conf /etc/powerdns/pdns.d/adblock_include.conf
+#configure the dns
+#edit resolve.conf or something
 
-		echo 'zone "'$LOCAL_DOMAIN'" {' >> /etc/powerdns/pdns.d/$(LOCAL_DOMAIN).conf
-		echo '        type master;' >> /etc/powerdns/pdns.d/$(LOCAL_DOMAIN).conf
-		echo '        notify no;' >> /etc/powerdns/pdns.d/$(LOCAL_DOMAIN).conf
-		echo '        file "bind/'$LOCAL_DOMAIN'.zone";' >> /etc/powerdns/pdns.d/$(LOCAL_DOMAIN).conf
-		echo '        allow-update { none; };' >> /etc/powerdns/pdns.d/$(LOCAL_DOMAIN).conf
-		echo '};' >> /etc/powerdns/pdns.d/$(LOCAL_DOMAIN).conf
 
-		echo '$TTL 1h                 ; default time-to-live' >> /etc/powerdns/bind/$(LOCAL_DOMAIN).zone
-		echo '@                       IN      SOA ns.'$LOCAL_DOMAIN $REQUESTED_IP' (' >> /etc/powerdns/bind/$(LOCAL_DOMAIN).zone
-		echo '                                1; serial' >> /etc/powerdns/bind/$(LOCAL_DOMAIN).zone
-		echo '                                1d; refresh' >> /etc/powerdns/bind/$(LOCAL_DOMAIN).zone
-		echo '                                2h; retry' >> /etc/powerdns/bind/$(LOCAL_DOMAIN).zone
-		echo '                                4w; expire' >> /etc/powerdns/bind/$(LOCAL_DOMAIN).zone
-		echo '                                1h; minimum time-to-live' >> /etc/powerdns/bind/$(LOCAL_DOMAIN).zone
-		echo '                        )' >> /etc/powerdns/bind/$(LOCAL_DOMAIN).zone
-		echo '                        IN      NS      ns' >> /etc/powerdns/bind/$(LOCAL_DOMAIN).zone
-		echo '                        IN      A      ' $REQUESTED_IP >> /etc/powerdns/bind/$(LOCAL_DOMAIN).zone
-		echo 'ns                      IN      A      ' $REQUESTED_IP >> /etc/powerdns/bind/$(LOCAL_DOMAIN).zone
-#figure out the correct syntax and make these two look the same
-		echo '$TTL	86400	; one day' >> /etc/powerdns/null.zone.file
-		echo '@       IN      SOA     server      root.localhost. (' >> /etc/powerdns/bind/null.zone
-		echo '                        2012110100       ; serial number YYMMDDNN' >> /etc/powerdns/bind/null.zone
-		echo '                        28800   ; refresh  8 hours' >> /etc/powerdns/bind/null.zone
-		echo '                        7200    ; retry    2 hours' >> /etc/powerdns/bind/null.zone
-		echo '                        864000  ; expire  10 days' >> /etc/powerdns/bind/null.zone
-		echo '                        86400 ) ; min ttl  1 day' >> /etc/powerdns/bind/null.zone
-		echo '                NS      server' >> /etc/powerdns/bind/null.zone
-		echo '		A	0.0.0.0' >> /etc/powerdns/bind/null.zone
-		echo '*		IN      A       0.0.0.0' >> /etc/powerdns/bind/null.zone
+echo 'options { ' >> /etc/bind/named.conf.options
+echo '	directory "/var/cache/bind" ; ' >> /etc/bind/named.conf.options
+echo '	forwarders { 8.8.8.8 ; 8.8.4.4 ; } ; ' >> /etc/bind/named.conf.options
+echo '	auth-nxdomain no ; ' >> /etc/bind/named.conf.options
+echo '	listen-on port 53 { 127.0.0.1; '$REQUESTED_IP'; } ;' >> /etc/bind/named.conf.options
+echo '};' >> /etc/bind/named.conf.options
+
+
+
+# Create this file in the nano editor:
+#  nano /etc/bind/named.conf.local
+# Then add the following content:
+#  // named.conf.local file for BIND9 configuration
+#  //
+#  zone "domain.local"
+#  {
+#  type master ;
+#  file "/etc/bind/zone.domain.local" ;
+#  } ;
+
+#note I will not be using reverse look up
+
+
+
+#after I test this I will need to then include by add block list
+
+
+
+
+
+
+
 
 		#add local webserver
 		addgroup --system www-data
@@ -91,11 +73,6 @@ case "$*" in
 
 		echo 'server.modules += ("mod_cgi")' >> /etc/lighttpd/conf-enabled/10-cgi-php.conf
 		echo ' cgi.assign = (".php" => "/usr/bin/php5-cgi")' >> /etc/lighttpd/conf-enabled/10-cgi-php.conf
-
-		#/etc/init.d/lighttpd force-reload
-
-		#set powerdns, lighttpd to turn on automatically
-		#I think this already happens, verify
 
 		apt-get clean
 
