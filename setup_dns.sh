@@ -57,7 +57,11 @@ echo '};' >> /etc/bind/named.conf.options
 
 
 
-
+		#add webmin
+		sudo apt-get install perl libnet-ssleay-perl openssl libauthen-pam-perl libpam-runtime libio-pty-perl apt-show-versions python
+		wget http://prdownloads.sourceforge.net/webadmin/webmin_1.580_all.deb
+		sudo dpkg --install webmin_1.580_all.deb
+		sudo rm webmin_1.580_all.deb
 
 
 		#add local webserver
